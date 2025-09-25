@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cronograma Interativo - Mangá Scroll</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Chosen Palette: Warm Neutrals -->
+    <!-- Application Structure Plan: A dashboard-style single-page application. The structure starts with a high-level overview (key metrics dashboard), followed by interactive controls (filters for month and content type), a detailed card-based timeline view, and a summary visualization (doughnut chart). This structure was chosen to transform a static schedule into an interactive analysis tool, allowing users to move from a broad summary to specific details effortlessly. The user can immediately see the scope of the plan, then drill down to analyze specific campaigns or content types, making the data much more consumable and useful than a simple table. -->
+    <!-- Visualization & Content Choices: 
+        - Report Info: Overall post counts and campaign identification -> Goal: Inform -> Viz/Presentation Method: Key metric cards in a dashboard -> Interaction: Numbers update dynamically based on filters -> Justification: Provides an immediate, high-level summary of the filtered content plan. Method: HTML/Tailwind/JS.
+        - Report Info: Entire schedule of posts -> Goal: Organize/Explore -> Viz/Presentation Method: A responsive grid of content cards with distinct visual tags for type -> Interaction: Users can filter the cards shown by clicking on month or content type buttons -> Justification: Allows for intuitive exploration and detailed analysis of specific timeframes or strategic content categories. Method: HTML/Tailwind/JS.
+        - Report Info: Distribution of post types -> Goal: Compare proportions -> Viz/Presentation Method: Doughnut Chart -> Interaction: Chart dynamically redraws to reflect the filtered data, with tooltips showing exact counts -> Justification: Offers a quick visual understanding of the content strategy mix and how it changes with different filters. Library: Chart.js.
+    -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #FDFBF8;
+            color: #383838;
+        }
+        .filter-btn {
+            transition: all 0.2s ease-in-out;
+        }
+        .filter-btn.active {
+            background-color: #E57373 !important;
+            color: #FFFFFF !important;
+            font-weight: 600;
+        }
+        .card-tag {
+            font-size: 0.75rem;
+            font-weight: 500;
+            padding: 0.2rem 0.6rem;
+            border-radius: 9999px;
+            text-transform: uppercase;
+        }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 400px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 300px;
+            max-height: 400px;
+        }
+        @media (min-width: 768px) {
+            .chart-container {
+                height: 350px;
+            }
+        }
+    </style>
+</head>
+<body class="antialiased">
+    <div class="container mx-auto p-4 md:p-8">
+        <header class="text-center mb-8 md:mb-12">
+            <h1 class="text-3xl md:text-4xl font-bold text-[#D35454]">Cronograma de Conteúdo Interativo</h1>
+            <p class="text-lg text-gray-600 mt-2">Mangá Scroll | Setembro - Novembro 2025</p>
+        </header>
+
+        <main>
+            <section id="dashboard" class="mb-8 md:mb-12">
+                 <div class="text-center mb-6">
+                    <h2 class="text-2xl font-semibold text-gray-800">Visão Geral</h2>
+                    <p class="text-gray-500 mt-1">Um resumo do plano de conteúdo. Os números se atualizam com base nos filtros selecionados.</p>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 text-center">
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                        <h3 class="text-lg font-semibold text-gray-500">Total de Posts</h3>
+                        <p id="total-posts" class="text-4xl font-bold text-[#E57373] mt-2">0</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                        <h3 class="text-lg font-semibold text-gray-500">Campanhas Principais</h3>
+                        <p id="total-campaigns" class="text-4xl font-bold text-[#E57373] mt-2">0</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                        <h3 class="text-lg font-semibold text-gray-500">Dias de Atividade</h3>
+                        <p id="active-days" class="text-4xl font-bold text-[#E57373] mt-2">0</p>
+                    </div>
+                </div>
+            </section>
+            
+            <section id="filters" class="mb-8 p-6 bg-white rounded-xl shadow-sm border border-gray-200">
+                <div class="flex flex-col md:flex-row md:items-center md:justify-between">
+                    <div class="mb-4 md:mb-0">
+                        <h3 class="text-lg font-semibold text-gray-700">Filtrar por Mês</h3>
+                        <div id="month-filters" class="flex flex-wrap gap-2 mt-2">
+                            <button data-month="all" class="filter-btn active bg-gray-200 text-gray-700 px-4 py-2 rounded-full">Todos</button>
+                            <button data-month="Setembro" class="filter-btn bg-gray-200 text-gray-700 px-4 py-2 rounded-full">Setembro</button>
+                            <button data-month="Outubro" class="filter-btn bg-gray-200 text-gray-700 px-4 py-2 rounded-full">Outubro</button>
+                            <button data-month="Novembro" class="filter-btn bg-gray-200 text-gray-700 px-4 py-2 rounded-full">Novembro</button>
+                        </div>
+                    </div>
+                     <div class="w-full md:w-auto">
+                        <h3 class="text-lg font-semibold text-gray-700">Filtrar por Tipo de Conteúdo</h3>
+                        <select id="type-filter" class="w-full mt-2 p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#E57373] focus:border-transparent">
+                            <option value="all">Todos os Tipos</option>
+                        </select>
+                    </div>
+                </div>
+            </section>
+
+            <section id="timeline">
+                <div class="text-center mb-6">
+                    <h2 class="text-2xl font-semibold text-gray-800">Linha do Tempo de Conteúdo</h2>
+                    <p class="text-gray-500 mt-1">Explore todas as postagens planejadas. Use os filtros acima para refinar a visualização.</p>
+                </div>
+                <div id="timeline-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                </div>
+            </section>
+            
+            <section id="visualization" class="mt-10 md:mt-16">
+                 <div class="text-center mb-6">
+                    <h2 class="text-2xl font-semibold text-gray-800">Distribuição de Conteúdo</h2>
+                    <p class="text-gray-500 mt-1">Este gráfico mostra a proporção de cada tipo de conteúdo na sua seleção atual.</p>
+                </div>
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                    <div class="chart-container">
+                        <canvas id="content-type-chart"></canvas>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script>
+        const scheduleData = [
+            { month: 'Setembro', date: '24/09', day: 'Ter', type: 'Lançamento', details: 'Post de apresentação do Mangá Scroll + bio acadêmica.', campaign: 'Lançamento' },
+            { month: 'Setembro', date: '26/09', day: 'Qui', type: 'Divulgação', details: 'Card de sinopse breve de um mangá famoso (ex.: One Piece).', campaign: null },
+            { month: 'Setembro', date: '28/09', day: 'Dom', type: 'Interativo', details: 'Post: “Qual seu mangá favorito do momento?” (caixinha de perguntas).', campaign: null },
+            { month: 'Outubro', date: '01/10', day: 'Qua', type: 'Pré-evento', details: 'Teaser do evento: “Nos dias 04 e 05 estaremos no AAC Nerd!”', campaign: 'AAC Nerd' },
+            { month: 'Outubro', date: '03/10', day: 'Sex', type: 'Pré-evento', details: 'Lembrete: “Amanhã começa o AAC Nerd – venha conhecer o Mangá Scroll!”', campaign: 'AAC Nerd' },
+            { month: 'Outubro', date: '04/10', day: 'Sáb', type: 'Durante o evento', details: 'Foto/arte especial do AAC Nerd no feed + chamada “Estamos no evento!”', campaign: 'AAC Nerd' },
+            { month: 'Outubro', date: '05/10', day: 'Dom', type: 'Durante o evento', details: 'Stories com destaque: curiosidades de mangá + CTA: “Assine e leia sem limites!”', campaign: 'AAC Nerd' },
+            { month: 'Outubro', date: '07/10', day: 'Ter', type: 'Pós-evento', details: 'Agradecimento ao público do AAC Nerd + fotos ou arte de resumo.', campaign: 'AAC Nerd' },
+            { month: 'Outubro', date: '10/10', day: 'Sex', type: 'Divulgação', details: 'Sinopse curta (Naruto).', campaign: null },
+            { month: 'Outubro', date: '15/10', day: 'Qua', type: 'Institucional', details: 'Post “Top 3 vantagens do Mangá Scroll”.', campaign: null },
+            { month: 'Outubro', date: '20/10', day: 'Seg', type: 'Curiosidade', details: 'Curiosidade de mangá (Dragon Ball).', campaign: null },
+            { month: 'Outubro', date: '25/10', day: 'Sáb', type: 'Interativo', details: 'Enquetes (shounen x seinen, romance x ação).', campaign: null },
+            { month: 'Outubro', date: '30/10', day: 'Qui', type: 'Promocional', details: 'Destaque para plano gratuito: “Comece de graça e experimente já!”', campaign: null },
+            { month: 'Novembro', date: '03/11', day: 'Seg', type: 'Divulgação', details: 'Post com sinopse curta (Chainsaw Man).', campaign: null },
+            { month: 'Novembro', date: '07/11', day: 'Sex', type: 'Dica', details: '“Dica da semana” (mangá em destaque).', campaign: null },
+            { month: 'Novembro', date: '12/11', day: 'Qua', type: 'Engajamento', details: 'Post: “Qual foi o primeiro mangá que você leu?”', campaign: null },
+            { month: 'Novembro', date: '16/11', day: 'Dom', type: 'Curiosidade', details: 'Curiosidade (JoJo’s Bizarre Adventure).', campaign: null },
+            { month: 'Novembro', date: '20/11', day: 'Qui', type: 'Institucional', details: 'Post: “Mangá Scroll é 100% legal – apoiamos autores e tradutores”.', campaign: null },
+            { month: 'Novembro', date: '24/11', day: 'Seg', type: 'Teaser', details: 'Teaser Black Friday: “Algo épico está chegando 👀”.', campaign: 'Black Friday' },
+            { month: 'Novembro', date: '27/11', day: 'Qui', type: 'Anúncio', details: 'Anúncio oficial: “Black Friday Mangá Scroll – Desconto exclusivo na assinatura Premium!”', campaign: 'Black Friday' },
+            { month: 'Novembro', date: '29/11', day: 'Sáb', type: 'Contagem Regressiva', details: 'Post de contagem regressiva + CTA para assinar.', campaign: 'Black Friday' },
+            { month: 'Novembro', date: '30/11', day: 'Dom', type: 'Último Dia', details: 'Post: “Não perca! Últimas horas para garantir seu desconto 🚀”', campaign: 'Black Friday' }
+        ];
+
+        const state = {
+            month: 'all',
+            type: 'all'
+        };
+
+        const typeColors = {
+            'Lançamento': 'bg-red-200 text-red-800',
+            'Divulgação': 'bg-blue-200 text-blue-800',
+            'Interativo': 'bg-green-200 text-green-800',
+            'Pré-evento': 'bg-yellow-200 text-yellow-800',
+            'Durante o evento': 'bg-orange-200 text-orange-800',
+            'Pós-evento': 'bg-amber-200 text-amber-800',
+            'Institucional': 'bg-indigo-200 text-indigo-800',
+            'Curiosidade': 'bg-purple-200 text-purple-800',
+            'Promocional': 'bg-pink-200 text-pink-800',
+            'Dica': 'bg-teal-200 text-teal-800',
+            'Engajamento': 'bg-lime-200 text-lime-800',
+            'Teaser': 'bg-gray-200 text-gray-800',
+            'Anúncio': 'bg-rose-200 text-rose-800',
+            'Contagem Regressiva': 'bg-fuchsia-200 text-fuchsia-800',
+            'Último Dia': 'bg-red-300 text-red-900',
+            'default': 'bg-gray-200 text-gray-800'
+        };
+        
+        const chartColors = {
+            'Lançamento': '#FECACA',
+            'Divulgação': '#BFDBFE',
+            'Interativo': '#A7F3D0',
+            'Pré-evento': '#FDE68A',
+            'Durante o evento': '#FED7AA',
+            'Pós-evento': '#FCD34D',
+            'Institucional': '#C7D2FE',
+            'Curiosidade': '#DDD6FE',
+            'Promocional': '#FBCFE8',
+            'Dica': '#99F6E4',
+            'Engajamento': '#D9F99D',
+            'Teaser': '#E5E7EB',
+            'Anúncio': '#FECDD3',
+            'Contagem Regressiva': '#F5D0FE',
+            'Último Dia': '#FDA4AF',
+            'default': '#E5E7EB'
+        };
+
+
+        let contentTypeChart;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            populateTypeFilter();
+            setupEventListeners();
+            applyFilters();
+        });
+
+        function populateTypeFilter() {
+            const typeFilter = document.getElementById('type-filter');
+            const types = [...new Set(scheduleData.map(item => item.type))];
+            types.sort();
+            types.forEach(type => {
+                const option = document.createElement('option');
+                option.value = type;
+                option.textContent = type;
+                typeFilter.appendChild(option);
+            });
+        }
+
+        function setupEventListeners() {
+            document.getElementById('month-filters').addEventListener('click', (e) => {
+                if (e.target.tagName === 'BUTTON') {
+                    state.month = e.target.dataset.month;
+                    document.querySelectorAll('#month-filters button').forEach(btn => btn.classList.remove('active'));
+                    e.target.classList.add('active');
+                    applyFilters();
+                }
+            });
+
+            document.getElementById('type-filter').addEventListener('change', (e) => {
+                state.type = e.target.value;
+                applyFilters();
+            });
+        }
+
+        function applyFilters() {
+            let filteredData = scheduleData;
+
+            if (state.month !== 'all') {
+                filteredData = filteredData.filter(item => item.month === state.month);
+            }
+
+            if (state.type !== 'all') {
+                filteredData = filteredData.filter(item => item.type === state.type);
+            }
+            
+            renderTimeline(filteredData);
+            updateDashboard(filteredData);
+            updateChart(filteredData);
+        }
+
+        function renderTimeline(data) {
+            const grid = document.getElementById('timeline-grid');
+            grid.innerHTML = '';
+            if (data.length === 0) {
+                grid.innerHTML = `<div class="col-span-full text-center text-gray-500 py-10">
+                    <p class="text-xl">Nenhuma postagem encontrada.</p>
+                    <p>Tente ajustar seus filtros.</p>
+                </div>`;
+                return;
+            }
+            data.forEach(item => {
+                const colorClass = typeColors[item.type] || typeColors.default;
+                const card = `
+                    <div class="bg-white rounded-lg shadow-md border border-gray-100 p-5 flex flex-col h-full hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
+                        <div class="flex justify-between items-start mb-3">
+                            <div class="font-bold text-lg text-gray-800">${item.date}, ${item.day}</div>
+                            <div class="${colorClass} card-tag">${item.type}</div>
+                        </div>
+                        <p class="text-gray-600 flex-grow">${item.details}</p>
+                        ${item.campaign ? `<div class="mt-4 text-sm font-semibold text-[#E57373]">Campanha: ${item.campaign}</div>` : ''}
+                    </div>
+                `;
+                grid.innerHTML += card;
+            });
+        }
+        
+        function updateDashboard(data) {
+            document.getElementById('total-posts').textContent = data.length;
+            
+            const uniqueCampaigns = new Set(data.map(item => item.campaign).filter(Boolean));
+            document.getElementById('total-campaigns').textContent = uniqueCampaigns.size;
+            
+            const uniqueDays = new Set(data.map(item => `${item.month}-${item.date}`));
+            document.getElementById('active-days').textContent = uniqueDays.size;
+        }
+        
+        function updateChart(data) {
+            const ctx = document.getElementById('content-type-chart').getContext('2d');
+            const typeCounts = data.reduce((acc, item) => {
+                acc[item.type] = (acc[item.type] || 0) + 1;
+                return acc;
+            }, {});
+
+            const labels = Object.keys(typeCounts);
+            const values = Object.values(typeCounts);
+            const backgroundColors = labels.map(label => chartColors[label] || chartColors.default);
+
+            if (contentTypeChart) {
+                contentTypeChart.destroy();
+            }
+
+            contentTypeChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Número de Posts',
+                        data: values,
+                        backgroundColor: backgroundColors,
+                        borderColor: '#FDFBF8',
+                        borderWidth: 3
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                padding: 15,
+                                font: {
+                                    size: 12,
+                                    family: 'Inter, sans-serif'
+                                }
+                            }
+                        },
+                        tooltip: {
+                             callbacks: {
+                                label: function(context) {
+                                    let label = context.label || '';
+                                    if (label) {
+                                        label += ': ';
+                                    }
+                                    if (context.parsed !== null) {
+                                        label += context.parsed;
+                                    }
+                                    return label;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+    </script>
+</body>
+</html>
